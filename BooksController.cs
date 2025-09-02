@@ -35,11 +35,21 @@ namespace BookApiHttpClient
             return Books!;
         }
 
-        // [HttpGet("{id}")]
-        // public async Task<Book> GetBookByIdAsync()
-        // {
-            
-        // }
+        [HttpGet("{id}")]
+        public async Task<Book> GetBookByIdAsync(int id)
+        {
+            var httpClient = _httpClientFactory.CreateClient("BookFakeApi");
+
+            var httpResponseMessage = await httpClient.GetAsync($"Books/{id}");
+
+            var contentStream = await httpResponseMessage.Content.ReadAsStreamAsync();
+
+            var book = await JsonSerializer.DeserializeAsync<Book>(contentStream, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+
+            httpResponseMessage.EnsureSuccessStatusCode();
+
+            return book!;
+        }
 
     }
 }
