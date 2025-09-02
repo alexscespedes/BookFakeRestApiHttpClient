@@ -20,14 +20,10 @@ namespace BookApiHttpClient
         [HttpGet]
         public async Task<IEnumerable<Book>> GetBooksAsync()
         {
-            var client = _httpClientFactory.CreateClient();
-
-            var httpRequestMessage = new HttpRequestMessage(
-                HttpMethod.Get, "https://fakerestapi.azurewebsites.net/api/v1/Books"
-            );
+            var httpClient = _httpClientFactory.CreateClient("BookFakeApi");
 
             // var response = await client.GetAsync("");
-            var httpResponseMessage = await client.SendAsync(httpRequestMessage);
+            var httpResponseMessage = await httpClient.GetAsync("Books");
 
             if (httpResponseMessage.IsSuccessStatusCode)
             {
@@ -38,5 +34,12 @@ namespace BookApiHttpClient
 
             return Books!;
         }
+
+        // [HttpGet("{id}")]
+        // public async Task<Book> GetBookByIdAsync()
+        // {
+            
+        // }
+
     }
 }
