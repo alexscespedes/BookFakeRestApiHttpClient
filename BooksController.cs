@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
@@ -17,37 +18,37 @@ namespace BookApiHttpClient
             _httpClientFactory = httpClientFactory;
         }
 
-        public IEnumerable<Book>? Books { get; set; }
+        private HttpClient CreateClient() => _httpClientFactory.CreateClient("BookFakeApi");
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Book>>> GetBooksAsync()
         {
-            var httpClient = _httpClientFactory.CreateClient("BookFakeApi");
-
-            // var response = await client.GetAsync("");
+            using var httpClient = CreateClient();
             var httpResponseMessage = await httpClient.GetAsync("Books");
 
-            if (httpResponseMessage.IsSuccessStatusCode)
-            {
-                using var contentStream = await httpResponseMessage.Content.ReadAsStreamAsync();
+            if (!httpResponseMessage.IsSuccessStatusCode)
+                return StatusCode((int)httpResponseMessage.StatusCode);
 
-                Books = await JsonSerializer.DeserializeAsync<IEnumerable<Book>>(contentStream, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
-            }
-            return Ok(Books);
+            using var contentStream = await httpResponseMessage.Content.ReadAsStreamAsync();
+            var books = await JsonSerializer.DeserializeAsync<IEnumerable<Book>>(contentStream, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                
+            return Ok(books);
         }
 
         [HttpGet("{id}")]
         public async Task<ActionResult<Book>> GetBookByIdAsync(int id)
         {
-            var httpClient = _httpClientFactory.CreateClient("BookFakeApi");
+            using var httpClient = CreateClient();
+            using var httpResponseMessage = await httpClient.GetAsync($"Books/{id}");
 
-            var httpResponseMessage = await httpClient.GetAsync($"Books/{id}");
+            if (httpResponseMessage.StatusCode == HttpStatusCode.NotFound)
+                return NotFound();
 
-            var contentStream = await httpResponseMessage.Content.ReadAsStreamAsync();
+            if (!httpResponseMessage.IsSuccessStatusCode)
+                return StatusCode((int)httpResponseMessage.StatusCode);
 
-            var book = await JsonSerializer.DeserializeAsync<Book>(contentStream, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
-
-            httpResponseMessage.EnsureSuccessStatusCode();
+            using var contentStream = await httpResponseMessage.Content.ReadAsStreamAsync();
+            var book = await JsonSerializer.DeserializeAsync<Book>(contentStream, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
             return Ok(book);
         }
@@ -55,33 +56,36 @@ namespace BookApiHttpClient
         [HttpPost]
         public async Task<ActionResult<Book>> CreateBookAsync(Book book)
         {
-            var httpClient = _httpClientFactory.CreateClient("BookFakeApi");
+            using var httpClient = CreateClient();
+            using var httpResponseMessage = await httpClient.PostAsJsonAsync("Books", book);
 
-            var bookJson = new StringContent(JsonSerializer.Serialize(book),
-            Encoding.UTF8,
-            Application.Json);
+            if (!httpResponseMessage.IsSuccessStatusCode)
+                return StatusCode((int)httpResponseMessage.StatusCode);
 
-            using var httpResponseMessage =
-                await httpClient.PostAsync("Books", bookJson);
+            var createdBook = await httpResponseMessage.Content.ReadFromJsonAsync<Book>();
 
-            httpResponseMessage.EnsureSuccessStatusCode();
+            if (createdBook == null)
+                return Problem("the API did not return a created book");
 
-            return Created();
+            return Created(string.Empty, book);
+
+            // return CreatedAtAction(nameof(GetBookByIdAsync), new { id = book?.Id }, createdBook);
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateBookAsync(Book book)
+        public async Task<IActionResult> UpdateBookAsync(int id, Book book)
         {
-            var httpClient = _httpClientFactory.CreateClient("BookFakeApi");
+            if (id != book.Id)
+                return BadRequest("Book ID mismatch");
 
-            var bookJson = new StringContent(JsonSerializer.Serialize(book),
-            Encoding.UTF8,
-            Application.Json);
+            using var httpClient = CreateClient();
+            using var httpResponseMessage = await httpClient.PutAsJsonAsync($"Books/{id}", book);
 
-            using var httpResponseMessage =
-                await httpClient.PutAsync($"Books/{book.Id}", bookJson);
+            if (httpResponseMessage.StatusCode == HttpStatusCode.NotFound)
+                return NotFound();
 
-            httpResponseMessage.EnsureSuccessStatusCode();
+            if (!httpResponseMessage.IsSuccessStatusCode)
+                return StatusCode((int)httpResponseMessage.StatusCode);
 
             return NoContent();
         }
@@ -89,15 +93,16 @@ namespace BookApiHttpClient
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteBookAsync(int id)
         {
-            var httpClient = _httpClientFactory.CreateClient("BookFakeApi");
+            using var httpClient = CreateClient();
+            using var httpResponseMessage = await httpClient.DeleteAsync($"Books/{id}");
 
-            using var httpResponseMessage =
-                await httpClient.DeleteAsync($"Books/{id}");
+            if (httpResponseMessage.StatusCode == HttpStatusCode.NotFound)
+                return NotFound();
 
-            httpResponseMessage.EnsureSuccessStatusCode();
+            if (!httpResponseMessage.IsSuccessStatusCode)
+                return StatusCode((int)httpResponseMessage.StatusCode);
 
             return NoContent();
         }
-
     }
 }
