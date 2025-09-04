@@ -35,7 +35,7 @@ namespace BookApiHttpClient
             return Ok(books);
         }
 
-        [HttpGet("{id}")]
+        [HttpGet("{id}", Name = "GetBookById")]
         public async Task<ActionResult<Book>> GetBookByIdAsync(int id)
         {
             using var httpClient = CreateClient();
@@ -64,12 +64,12 @@ namespace BookApiHttpClient
 
             var createdBook = await httpResponseMessage.Content.ReadFromJsonAsync<Book>();
 
-            if (createdBook == null)
-                return Problem("the API did not return a created book");
+            // if (createdBook == null)
+            //     return Created("/api/Books", book);
 
-            return Created(string.Empty, book);
+            // return Created(string.Empty, book);
 
-            // return CreatedAtAction(nameof(GetBookByIdAsync), new { id = book?.Id }, createdBook);
+            return CreatedAtRoute("GetBookById", new { id = createdBook?.Id }, createdBook);
         }
 
         [HttpPut("{id}")]
